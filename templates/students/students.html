@@ -24,12 +24,13 @@
         <select id="majorFilter" class="select-input">
             <option value="">All Majors</option>
             {% for major in majors %}
-            <option value="{{ major }}">{{ major }}</option>
+            <option value="{{ major }}" {% if request.args.get('major') == major %}selected{% endif %}>{{ major }}</option>
             {% endfor %}
         </select>
     </div>
     <div class="filter-group">
-        <button class="btn btn-secondary" id="resetFilters">Reset Filters</button>
+        <button class="btn btn-primary" id="applyFiltersBtn">Filter</button>
+        <button class="btn btn-secondary" id="resetFilters">Reset</button>
     </div>
 </div>
 
@@ -513,6 +514,27 @@ studentForm.addEventListener('submit', async (e) => {
         formMessage.style.display = 'block';
     }
 });
+
+// Search & Filter
+function applyFilters() {
+    const search = document.getElementById('searchInput').value.trim();
+    const major = document.getElementById('majorFilter').value;
+    const params = new URLSearchParams();
+    if (search) params.append('search', search);
+    if (major) params.append('major', major);
+    window.location.href = '/students?' + params.toString();
+}
+
+const applyBtn = document.getElementById('applyFiltersBtn');
+if (applyBtn) {
+    applyBtn.addEventListener('click', applyFilters);
+}
+
+document.getElementById('searchInput').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') applyFilters();
+});
+
+document.getElementById('majorFilter').addEventListener('change', applyFilters);
 
 // Reset Filters
 document.getElementById('resetFilters').addEventListener('click', () => {

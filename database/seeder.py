@@ -156,13 +156,19 @@ class DatabaseSeeder:
                 if existing:
                     continue
                 
-                # Generate realistic academic data
-                gpa = round(random.uniform(2.0, 4.0), 2)
-                attendance = round(random.uniform(70, 100), 2)
-                assignment_score = round(random.uniform(60, 100), 2)
-                midterm_score = round(random.uniform(60, 100), 2)
-                final_score = round(random.uniform(60, 100), 2)
-                study_hours = round(random.uniform(2, 15), 2)
+                # Generate realistic academic data with strong correlations
+                attendance = round(random.uniform(65, 100), 2)
+                assignment_score = round(random.uniform(55, 100), 2)
+                midterm_score = round(random.uniform(50, 100), 2)
+                final_score = round(random.uniform(50, 100), 2)
+                study_hours = round(random.uniform(2, 20), 2)
+                
+                # Realistic weighted calculation (assignments: 20%, midterm: 30%, final: 35%, attendance: 15%)
+                composite = (0.20 * assignment_score + 0.30 * midterm_score + 0.35 * final_score + 0.15 * attendance)
+                base_gpa = (composite / 100.0) * 4.0
+                study_bonus = (study_hours / 20.0) * 0.15
+                noise = random.gauss(0, 0.05)
+                gpa = round(max(1.5, min(4.0, base_gpa + study_bonus + noise)), 2)
                 
                 # Determine academic status
                 if gpa >= 3.5:
@@ -247,7 +253,7 @@ class DatabaseSeeder:
         for record in records:
             student_id = record['student_id']
             semester = record['semester'] + 1
-            actual_gpa = record['gpa']
+            actual_gpa = float(record['gpa'])
             
             # Check if prediction exists
             check_query = """
@@ -259,11 +265,12 @@ class DatabaseSeeder:
             if existing:
                 continue
             
-            predicted_gpa = round(random.uniform(2.0, 4.0), 2)
+            predicted_gpa = round(float(actual_gpa) + random.uniform(-0.15, 0.15), 2)
+            predicted_gpa = max(1.5, min(4.0, predicted_gpa))
             model_used = random.choice(models)
             mae = round(abs(predicted_gpa - actual_gpa), 4)
             rmse = round(mae * 1.2, 4)
-            r_squared = round(random.uniform(0.7, 0.95), 4)
+            r_squared = round(random.uniform(0.85, 0.95), 4)
             
             insert_query = """
                 INSERT INTO prediction_results 
@@ -278,7 +285,17 @@ class DatabaseSeeder:
         
         logger.info(f"✓ Seeded {count} prediction results")
     
-    def run(self, count=150):
+    def clean_tables(self):
+        """Clean all data tables before fresh seeding"""
+        logger.info("Cleaning existing data...")
+        tables = ['prediction_results', 'risk_assessments', 'academic_records', 'students', 'users']
+        self.execute("SET FOREIGN_KEY_CHECKS = 0;")
+        for t in tables:
+            self.execute(f"TRUNCATE TABLE {t};")
+        self.execute("SET FOREIGN_KEY_CHECKS = 1;")
+        logger.info("✓ Cleaned existing tables")
+
+    def run(self, count=150, clean=False):
         """Run all seeders"""
         if not self.connect():
             logger.error("Failed to connect to database")
@@ -288,6 +305,9 @@ class DatabaseSeeder:
             logger.info("=" * 50)
             logger.info("Starting database seeding...")
             logger.info("=" * 50)
+            
+            if clean:
+                self.clean_tables()
             
             self.seed_users()
             self.seed_students(count)
@@ -312,5 +332,7 @@ class DatabaseSeeder:
                 self.connection.close()
 
 if __name__ == '__main__':
+    import sys
+    clean = '--clean' in sys.argv
     seeder = DatabaseSeeder()
-    seeder.run(count=150)
+    seeder.run(count=150, clean=clean)
