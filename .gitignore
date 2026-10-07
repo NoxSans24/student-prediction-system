@@ -32,7 +32,7 @@ MANIFEST
 venv/
 ENV/
 env/
-.venv
+.venv/
 
 # IDE
 .vscode/
@@ -42,9 +42,11 @@ env/
 *~
 .DS_Store
 
+# OpenCode / OMO
+.omo/
+
 # ML Models
-ml/models/*.joblib
-ml/models/*.pkl
+ml/models/
 
 # Data
 data/raw/*.csv
