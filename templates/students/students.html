@@ -1,0 +1,524 @@
+{% extends "base.html" %}
+
+{% block title %}Students - SPA{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="header-top">
+        <div>
+            <h1>Students Management</h1>
+            <p class="subtitle">Manage and view student information</p>
+        </div>
+        {% if session.get('role') == 'admin' %}
+        <button class="btn btn-primary" id="addStudentBtn">+ Add Student</button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Filters Section -->
+<div class="filter-section">
+    <div class="filter-group">
+        <input type="text" id="searchInput" class="search-input" placeholder="Search by name or ID..." value="{{ search or '' }}">
+    </div>
+    <div class="filter-group">
+        <select id="majorFilter" class="select-input">
+            <option value="">All Majors</option>
+            {% for major in majors %}
+            <option value="{{ major }}">{{ major }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="filter-group">
+        <button class="btn btn-secondary" id="resetFilters">Reset Filters</button>
+    </div>
+</div>
+
+<!-- Students Table -->
+<div class="table-container">
+    {% if students %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Student ID</th>
+                <th>Name</th>
+                <th>Major</th>
+                <th>Semester</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in students %}
+            <tr class="student-row" data-student-id="{{ student.id }}">
+                <td><strong>{{ student.student_id }}</strong></td>
+                <td>{{ student.name }}</td>
+                <td><span class="badge badge-info">{{ student.major }}</span></td>
+                <td><span class="badge badge-primary">S{{ student.current_semester }}</span></td>
+                <td class="actions">
+                    <button class="btn btn-sm btn-info viewBtn" data-student-id="{{ student.id }}">View</button>
+                    {% if session.get('role') == 'admin' %}
+                    <button class="btn btn-sm btn-warning editBtn" data-student-id="{{ student.id }}">Edit</button>
+                    <button class="btn btn-sm btn-danger deleteBtn" data-student-id="{{ student.id }}">Delete</button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Pagination -->
+    {% if total > 0 %}
+    <div class="pagination">
+        {% if page > 1 %}
+        <a href="?page=1{% if search %}&search={{ search }}{% endif %}" class="page-link">« First</a>
+        <a href="?page={{ page - 1 }}{% if search %}&search={{ search }}{% endif %}" class="page-link">‹ Previous</a>
+        {% endif %}
+
+        <span class="page-info">Page {{ page }} (Total: {{ total }} students)</span>
+
+        {% if (page * 20) < total %}
+        <a href="?page={{ page + 1 }}{% if search %}&search={{ search }}{% endif %}" class="page-link">Next ›</a>
+        <a href="?page={{ (total / 20)|int + 1 }}" class="page-link">Last »</a>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="empty-state">
+        <p>No students found</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Add/Edit Student Modal -->
+<div id="studentModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modalTitle">Add Student</h2>
+            <button class="modal-close" id="closeModal">&times;</button>
+        </div>
+        <form id="studentForm" class="form">
+            <input type="hidden" id="studentId" value="">
+            
+            <div class="form-group">
+                <label for="studentIdInput">Student ID</label>
+                <input type="text" id="studentIdInput" name="student_id" required 
+                       placeholder="202400001" maxlength="30">
+            </div>
+
+            <div class="form-group">
+                <label for="studentNameInput">Full Name</label>
+                <input type="text" id="studentNameInput" name="name" required 
+                       placeholder="John Doe" maxlength="100">
+            </div>
+
+            <div class="form-group">
+                <label for="studentMajorInput">Major</label>
+                <input type="text" id="studentMajorInput" name="major" required 
+                       placeholder="Informatics" maxlength="100">
+            </div>
+
+            <div class="form-group">
+                <label for="studentSemesterInput">Current Semester</label>
+                <input type="number" id="studentSemesterInput" name="current_semester" required 
+                       min="1" max="8">
+            </div>
+
+            <div id="formMessage" class="form-message" style="display: none;"></div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- View Student Modal -->
+<div id="viewModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Student Details</h2>
+            <button class="modal-close" id="closeViewModal">&times;</button>
+        </div>
+        <div id="viewContent" class="modal-body">
+            <!-- Content will be loaded here -->
+        </div>
+    </div>
+</div>
+
+<style>
+.header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.filter-section {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    flex: 1;
+    min-width: 200px;
+}
+
+.search-input,
+.select-input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.table-container {
+    background: var(--color-surface);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table thead {
+    background: var(--color-accent);
+    color: var(--color-primary);
+}
+
+.data-table th {
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 13px;
+}
+
+.data-table td {
+    padding: 12px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.data-table tbody tr:hover {
+    background-color: var(--color-background);
+}
+
+.actions {
+    display: flex;
+    gap: 6px;
+}
+
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 12px;
+}
+
+.badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.badge-info {
+    background-color: #e3f2fd;
+    color: #1976d2;
+}
+
+.badge-primary {
+    background-color: #f3e5f5;
+    color: #7b1fa2;
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    padding: 20px;
+}
+
+.page-link {
+    padding: 6px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    text-decoration: none;
+    color: var(--color-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.page-link:hover {
+    background-color: var(--color-accent);
+}
+
+.page-info {
+    padding: 0 12px;
+    font-size: 13px;
+    color: var(--color-secondary);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px;
+    color: var(--color-muted);
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--color-surface);
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--color-secondary);
+}
+
+.form {
+    padding: 20px;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.form-actions button {
+    flex: 1;
+}
+
+.form-message {
+    padding: 12px;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    font-size: 14px;
+}
+
+.form-message.success {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.form-message.error {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+</style>
+
+<script>
+const modal = document.getElementById('studentModal');
+const viewModal = document.getElementById('viewModal');
+const addBtn = document.getElementById('addStudentBtn');
+const closeBtn = document.getElementById('closeModal');
+const closeViewBtn = document.getElementById('closeViewModal');
+const cancelBtn = document.getElementById('cancelBtn');
+const studentForm = document.getElementById('studentForm');
+const formMessage = document.getElementById('formMessage');
+
+// Add Student Button
+if (addBtn) {
+    addBtn.addEventListener('click', () => {
+        document.getElementById('modalTitle').textContent = 'Add Student';
+        studentForm.reset();
+        document.getElementById('studentId').value = '';
+        document.getElementById('studentIdInput').disabled = false;
+        formMessage.style.display = 'none';
+        modal.classList.add('active');
+    });
+}
+
+// Close Modal
+closeBtn.addEventListener('click', () => modal.classList.remove('active'));
+closeViewBtn.addEventListener('click', () => viewModal.classList.remove('active'));
+cancelBtn.addEventListener('click', () => modal.classList.remove('active'));
+
+// Close on outside click
+window.addEventListener('click', (e) => {
+    if (e.target === modal) modal.classList.remove('active');
+    if (e.target === viewModal) viewModal.classList.remove('active');
+});
+
+// Edit Button
+document.querySelectorAll('.editBtn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+        const studentId = e.target.dataset.studentId;
+        const row = document.querySelector(`[data-student-id="${studentId}"]`);
+        
+        document.getElementById('modalTitle').textContent = 'Edit Student';
+        document.getElementById('studentId').value = studentId;
+        document.getElementById('studentIdInput').value = row.cells[0].textContent;
+        document.getElementById('studentIdInput').disabled = true;
+        document.getElementById('studentNameInput').value = row.cells[1].textContent;
+        document.getElementById('studentMajorInput').value = row.cells[2].textContent.trim();
+        document.getElementById('studentSemesterInput').value = row.cells[3].textContent.match(/\d+/)[0];
+        
+        formMessage.style.display = 'none';
+        modal.classList.add('active');
+    });
+});
+
+// View Button
+document.querySelectorAll('.viewBtn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const row = e.target.closest('tr');
+        const content = `
+            <div class="view-details">
+                <p><strong>Student ID:</strong> ${row.cells[0].textContent}</p>
+                <p><strong>Name:</strong> ${row.cells[1].textContent}</p>
+                <p><strong>Major:</strong> ${row.cells[2].textContent}</p>
+                <p><strong>Semester:</strong> ${row.cells[3].textContent}</p>
+            </div>
+        `;
+        document.getElementById('viewContent').innerHTML = content;
+        viewModal.classList.add('active');
+    });
+});
+
+// Delete Button
+document.querySelectorAll('.deleteBtn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+        if (!confirm('Are you sure you want to delete this student?')) return;
+        
+        const studentId = e.target.dataset.studentId;
+        
+        try {
+            const response = await fetch(`/api/students/${studentId}`, {
+                method: 'DELETE'
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert('Student deleted successfully');
+                location.reload();
+            } else {
+                alert('Error: ' + data.error.message);
+            }
+        } catch (error) {
+            alert('Error: ' + error.message);
+        }
+    });
+});
+
+// Submit Form
+studentForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const studentId = document.getElementById('studentId').value;
+    const data = {
+        student_id: document.getElementById('studentIdInput').value,
+        name: document.getElementById('studentNameInput').value,
+        major: document.getElementById('studentMajorInput').value,
+        current_semester: parseInt(document.getElementById('studentSemesterInput').value)
+    };
+    
+    try {
+        let response;
+        if (studentId) {
+            // Edit
+            response = await fetch(`/api/students/${studentId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+        } else {
+            // Create
+            response = await fetch('/api/students', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showMessage('Student saved successfully', 'success');
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
+        } else {
+            showMessage('Error: ' + result.error.message, 'error');
+        }
+    } catch (error) {
+        showMessage('Error: ' + error.message, 'error');
+    }
+    
+    function showMessage(msg, type) {
+        formMessage.textContent = msg;
+        formMessage.className = 'form-message ' + type;
+        formMessage.style.display = 'block';
+    }
+});
+
+// Reset Filters
+document.getElementById('resetFilters').addEventListener('click', () => {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('majorFilter').value = '';
+    window.location.href = '/students';
+});
+</script>
+{% endblock %}

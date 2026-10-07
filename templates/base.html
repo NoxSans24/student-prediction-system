@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Student Performance Analytics{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/layout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/utilities.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="logo">SPA</h1>
+                <p class="tagline">Student Performance</p>
+            </div>
+            
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <h3 class="nav-title">Overview</h3>
+                    <ul class="nav-list">
+                        <li><a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a></li>
+                        <li><a href="{{ url_for('students') }}" class="nav-link">Students</a></li>
+                        <li><a href="{{ url_for('analytics') }}" class="nav-link">Analytics</a></li>
+                    </ul>
+                </div>
+                
+                <div class="nav-section">
+                    <h3 class="nav-title">Intelligence</h3>
+                    <ul class="nav-list">
+                        <li><a href="{{ url_for('prediction') }}" class="nav-link">Prediction</a></li>
+                        <li><a href="{{ url_for('risk') }}" class="nav-link">Risk Analysis</a></li>
+                    </ul>
+                </div>
+                
+                {% if session.get('role') == 'admin' %}
+                <div class="nav-section">
+                    <h3 class="nav-title">Admin</h3>
+                    <ul class="nav-list">
+                        <li><a href="#" class="nav-link">Dataset</a></li>
+                        <li><a href="#" class="nav-link">Training</a></li>
+                    </ul>
+                </div>
+                {% endif %}
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <p class="user-name">{{ session.get('username') }}</p>
+                    <p class="user-role">{{ session.get('role')|upper }}</p>
+                </div>
+                <a href="{{ url_for('logout') }}" class="logout-btn">Logout</a>
+            </div>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Topbar -->
+            <header class="topbar">
+                <div class="topbar-left">
+                    <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+                </div>
+                
+                <div class="topbar-center">
+                    <input type="text" class="search-input" placeholder="Search students, majors...">
+                </div>
+                
+                <div class="topbar-right">
+                    <button class="theme-toggle" id="themeToggle">◐</button>
+                    <button class="notification-btn">🔔</button>
+                </div>
+            </header>
+            
+            <!-- Page Content -->
+            <div class="page-content">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/sidebar.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

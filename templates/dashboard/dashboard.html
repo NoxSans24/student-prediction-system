@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Student Performance Analytics{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Dashboard</h1>
+    <p class="subtitle">Overview of your academic data</p>
+    <span class="last-updated">Last updated: Today</span>
+</div>
+
+<!-- KPI Section -->
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div class="kpi-header">
+            <h3 class="kpi-title">Total Students</h3>
+        </div>
+        <div class="kpi-value">{{ total_students }}</div>
+        <p class="kpi-change">+6.2% from previous semester</p>
+    </div>
+    
+    <div class="kpi-card">
+        <div class="kpi-header">
+            <h3 class="kpi-title">Average GPA</h3>
+        </div>
+        <div class="kpi-value">{% if gpa_stats %}{{ "%.2f"|format(gpa_stats.mean) }}{% else %}--{% endif %}</div>
+        <p class="kpi-change">+0.18 from previous semester</p>
+    </div>
+    
+    <div class="kpi-card">
+        <div class="kpi-header">
+            <h3 class="kpi-title">Average Attendance</h3>
+        </div>
+        <div class="kpi-value">{% if att_stats %}{{ "%.1f"|format(att_stats.mean) }}%{% else %}--{% endif %}</div>
+        <p class="kpi-change">+2.1% from previous semester</p>
+    </div>
+    
+    <div class="kpi-card kpi-card-risk">
+        <div class="kpi-header">
+            <h3 class="kpi-title">At Risk</h3>
+        </div>
+        <div class="kpi-value">{{ at_risk }}</div>
+        <p class="kpi-change">6.9% of students</p>
+    </div>
+</div>
+
+<!-- Charts Section -->
+<div class="charts-grid">
+    <div class="chart-card">
+        <h3 class="chart-title">GPA Trend</h3>
+        <p class="chart-subtitle">Average GPA across semesters</p>
+        <div class="chart-container">
+            <canvas id="gpaTrendChart"></canvas>
+        </div>
+    </div>
+    
+    <div class="chart-card">
+        <h3 class="chart-title">Performance Distribution</h3>
+        <div class="chart-container">
+            <canvas id="performanceDistChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="charts-grid">
+    <div class="chart-card">
+        <h3 class="chart-title">Attendance vs GPA</h3>
+        <div class="chart-container">
+            <canvas id="attVsGpaChart"></canvas>
+        </div>
+    </div>
+    
+    <div class="chart-card">
+        <h3 class="chart-title">GPA by Major</h3>
+        <div class="chart-container">
+            <canvas id="gpaByMajorChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Insights Section -->
+<div class="insights-section">
+    <h2 class="section-title">Academic Insights</h2>
+    <div class="insights-grid">
+        {% for insight in insights %}
+        <div class="insight-card insight-{{ insight.priority }}">
+            <div class="insight-header">
+                <h4 class="insight-title">{{ insight.title }}</h4>
+                <span class="insight-priority">{{ insight.priority|upper }}</span>
+            </div>
+            <p class="insight-message">{{ insight.message }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- High Risk Students Section -->
+<div class="high-risk-section">
+    <h2 class="section-title">Students Requiring Attention</h2>
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Student ID</th>
+                    <th>Name</th>
+                    <th>Risk Level</th>
+                    <th>GPA Risk</th>
+                    <th>Attendance Risk</th>
+                    <th>Date Assessed</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in high_risk %}
+                <tr>
+                    <td>{{ student.student_id }}</td>
+                    <td>{{ student.name }}</td>
+                    <td><span class="risk-badge risk-{{ student.risk_level|lower }}">{{ student.risk_level }}</span></td>
+                    <td>{{ "%.2f"|format(student.gpa_risk) if student.gpa_risk else '--' }}</td>
+                    <td>{{ "%.2f"|format(student.attendance_risk) if student.attendance_risk else '--' }}</td>
+                    <td>{{ student.assessment_date.strftime('%Y-%m-%d') if student.assessment_date else '--' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// GPA Trend Chart
+const gpaTrendData = {{ gpa_trend|tojson }};
+const semesters = Object.keys(gpaTrendData).sort();
+const gpas = semesters.map(s => gpaTrendData[s]);
+
+new Chart(document.getElementById('gpaTrendChart'), {
+    type: 'line',
+    data: {
+        labels: semesters,
+        datasets: [{
+            label: 'Average GPA',
+            data: gpas,
+            borderColor: '#262626',
+            backgroundColor: 'rgba(38, 38, 38, 0.1)',
+            tension: 0.4,
+            fill: true,
+            pointRadius: 6,
+            pointBackgroundColor: '#262626'
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {legend: {display: false}},
+        scales: {y: {beginAtZero: true, max: 4}}
+    }
+});
+
+// Performance Distribution
+const distData = {{ gpa_dist|tojson }};
+new Chart(document.getElementById('performanceDistChart'), {
+    type: 'doughnut',
+    data: {
+        labels: Object.keys(distData),
+        datasets: [{
+            data: Object.values(distData),
+            backgroundColor: ['#4ade80', '#facc15', '#fca5a5']
+        }]
+    },
+    options: {responsive: true}
+});
+
+// Attendance vs GPA
+const attVsGpaData = {{ att_vs_gpa|tojson }};
+const attVsGpaChart = new Chart(document.getElementById('attVsGpaChart'), {
+    type: 'scatter',
+    data: {
+        datasets: [{
+            label: 'Students',
+            data: attVsGpaData.map(d => ({x: d.attendance, y: d.gpa})),
+            backgroundColor: 'rgba(38, 38, 38, 0.6)',
+            pointRadius: 4
+        }]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            x: {title: {display: true, text: 'Attendance %'}},
+            y: {title: {display: true, text: 'GPA'}, max: 4}
+        }
+    }
+});
+
+// GPA by Major
+const gpaByMajorData = {{ gpa_by_major|tojson }};
+new Chart(document.getElementById('gpaByMajorChart'), {
+    type: 'bar',
+    data: {
+        labels: Object.keys(gpaByMajorData),
+        datasets: [{
+            label: 'Average GPA',
+            data: Object.values(gpaByMajorData).map(d => d.avg_gpa),
+            backgroundColor: '#262626'
+        }]
+    },
+    options: {
+        responsive: true,
+        indexAxis: 'y',
+        plugins: {legend: {display: false}},
+        scales: {x: {max: 4}}
+    }
+});
+</script>
+{% endblock %}

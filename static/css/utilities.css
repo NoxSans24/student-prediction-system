@@ -1,0 +1,19 @@
+/* Layout utilities */
+.layout { display: flex; }
+.layout-col { flex-direction: column; }
+
+/* Spacing */
+.mt { margin-top: 16px; }
+.mb { margin-bottom: 16px; }
+.p { padding: 16px; }
+
+/* Text */
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.font-bold { font-weight: 600; }
+.font-small { font-size: 12px; }
+
+/* Display */
+.hidden { display: none; }
+.block { display: block; }
+.inline { display: inline; }

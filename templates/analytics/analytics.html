@@ -1,0 +1,453 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics - SPA{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Analytics Dashboard</h1>
+    <p class="subtitle">Comprehensive analysis of student academic performance</p>
+</div>
+
+<div class="analytics-container">
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>Total Students</h3>
+            <p class="stat-value" id="totalStudents">-</p>
+        </div>
+        <div class="stat-card">
+            <h3>Average GPA</h3>
+            <p class="stat-value" id="avgGPA">-</p>
+        </div>
+        <div class="stat-card">
+            <h3>At Risk</h3>
+            <p class="stat-value stat-warning" id="atRisk">-</p>
+        </div>
+        <div class="stat-card">
+            <h3>Avg Attendance</h3>
+            <p class="stat-value" id="avgAttendance">-%</p>
+        </div>
+    </div>
+
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h3>GPA Trend</h3>
+            <canvas id="gpaTrendChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+            <h3>GPA Distribution</h3>
+            <canvas id="gpaDistChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+            <h3>GPA by Major</h3>
+            <canvas id="gpaByMajorChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+            <h3>GPA by Semester</h3>
+            <canvas id="gpaBySemesterChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+            <h3>Attendance vs GPA</h3>
+            <canvas id="attendanceVsGpaChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+            <h3>Study Hours vs GPA</h3>
+            <canvas id="studyHoursVsGpaChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+            <h3>Score Analysis</h3>
+            <canvas id="scoreAnalysisChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+            <h3>Correlation Matrix</h3>
+            <div id="correlationMatrix" class="correlation-container"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+.analytics-container {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.stat-card {
+    background: var(--color-surface);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.stat-card h3 {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-secondary);
+}
+
+.stat-value {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+.stat-value.stat-warning {
+    color: #d32f2f;
+}
+
+.charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 24px;
+}
+
+@media (max-width: 1024px) {
+    .charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.chart-card {
+    background: var(--color-surface);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.chart-card h3 {
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--color-primary);
+}
+
+.chart-card canvas {
+    max-height: 300px;
+}
+
+.correlation-container {
+    overflow-x: auto;
+}
+
+.correlation-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.correlation-table th,
+.correlation-table td {
+    padding: 8px;
+    text-align: center;
+    border: 1px solid var(--color-border);
+}
+
+.correlation-table th {
+    background-color: var(--color-accent);
+    font-weight: 600;
+}
+
+.correlation-cell {
+    display: inline-block;
+    width: 100%;
+    height: 100%;
+    padding: 8px;
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.corr-positive {
+    background-color: #c8e6c9;
+    color: #2e7d32;
+}
+
+.corr-negative {
+    background-color: #ffcdd2;
+    color: #c62828;
+}
+
+.corr-neutral {
+    background-color: #e0e0e0;
+    color: #424242;
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+
+<script>
+let charts = {};
+
+async function loadAnalytics() {
+    try {
+        const response = await fetch('/api/analytics/summary');
+        const data = await response.json();
+        
+        if (!data.success) {
+            console.error('Error loading analytics:', data.error);
+            return;
+        }
+        
+        const analytics = data.analytics;
+        
+        updateStats(analytics);
+        createCharts(analytics);
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+function updateStats(data) {
+    document.getElementById('totalStudents').textContent = data.total_students || 0;
+    document.getElementById('avgGPA').textContent = (data.gpa_stats?.mean || 0).toFixed(2);
+    document.getElementById('atRisk').textContent = data.at_risk || 0;
+    document.getElementById('avgAttendance').textContent = 
+        (data.attendance_stats?.mean || 0).toFixed(1) + '%';
+}
+
+function createCharts(data) {
+    createGpaTrendChart(data.gpa_trend);
+    createGpaDistributionChart(data.gpa_distribution);
+    createGpaByMajorChart(data.gpa_by_major);
+    createGpaBySemesterChart(data.gpa_by_semester);
+    createAttendanceVsGpaChart(data.attendance_vs_gpa);
+    createStudyHoursVsGpaChart(data.study_hours_vs_gpa);
+    createScoreAnalysisChart(data.score_analysis);
+    createCorrelationMatrix(data.correlation_matrix);
+}
+
+function createGpaTrendChart(data) {
+    const ctx = document.getElementById('gpaTrendChart').getContext('2d');
+    
+    if (charts.gpaTrend) charts.gpaTrend.destroy();
+    
+    charts.gpaTrend = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: Object.keys(data || {}),
+            datasets: [{
+                label: 'Average GPA',
+                data: Object.values(data || {}),
+                borderColor: '#1976d2',
+                backgroundColor: 'rgba(25, 118, 210, 0.1)',
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: { legend: { display: true } }
+        }
+    });
+}
+
+function createGpaDistributionChart(data) {
+    const ctx = document.getElementById('gpaDistChart').getContext('2d');
+    
+    if (charts.gpaDist) charts.gpaDist.destroy();
+    
+    charts.gpaDist = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(data || {}),
+            datasets: [{
+                data: Object.values(data || {}),
+                backgroundColor: ['#4caf50', '#2196f3', '#ff9800', '#f44336']
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true
+        }
+    });
+}
+
+function createGpaByMajorChart(data) {
+    const ctx = document.getElementById('gpaByMajorChart').getContext('2d');
+    
+    if (charts.gpaByMajor) charts.gpaByMajor.destroy();
+    
+    charts.gpaByMajor = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(data || {}),
+            datasets: [{
+                label: 'Average GPA',
+                data: Object.keys(data || {}).map(key => data[key]?.avg_gpa || 0),
+                backgroundColor: '#1976d2'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: { beginAtZero: true, max: 4.0 }
+            }
+        }
+    });
+}
+
+function createGpaBySemesterChart(data) {
+    const ctx = document.getElementById('gpaBySemesterChart').getContext('2d');
+    
+    if (charts.gpaBySemester) charts.gpaBySemester.destroy();
+    
+    charts.gpaBySemester = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: Object.keys(data || {}),
+            datasets: [{
+                label: 'Average GPA',
+                data: Object.keys(data || {}).map(key => data[key]?.avg_gpa || 0),
+                borderColor: '#7b1fa2',
+                backgroundColor: 'rgba(123, 31, 162, 0.1)',
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: { beginAtZero: true, max: 4.0 }
+            }
+        }
+    });
+}
+
+function createAttendanceVsGpaChart(data) {
+    const ctx = document.getElementById('attendanceVsGpaChart').getContext('2d');
+    
+    if (charts.attVsGpa) charts.attVsGpa.destroy();
+    
+    charts.attVsGpa = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Attendance vs GPA',
+                data: (data || []).map(d => ({
+                    x: d.attendance,
+                    y: d.gpa
+                })),
+                backgroundColor: '#ff5722'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                x: { title: { display: true, text: 'Attendance (%)' } },
+                y: { title: { display: true, text: 'GPA' } }
+            }
+        }
+    });
+}
+
+function createStudyHoursVsGpaChart(data) {
+    const ctx = document.getElementById('studyHoursVsGpaChart').getContext('2d');
+    
+    if (charts.studyVsGpa) charts.studyVsGpa.destroy();
+    
+    charts.studyVsGpa = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Study Hours vs GPA',
+                data: (data || []).map(d => ({
+                    x: d.study_hours,
+                    y: d.gpa
+                })),
+                backgroundColor: '#00bcd4'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                x: { title: { display: true, text: 'Study Hours' } },
+                y: { title: { display: true, text: 'GPA' } }
+            }
+        }
+    });
+}
+
+function createScoreAnalysisChart(data) {
+    const ctx = document.getElementById('scoreAnalysisChart').getContext('2d');
+    
+    if (charts.scoreAnalysis) charts.scoreAnalysis.destroy();
+    
+    charts.scoreAnalysis = new Chart(ctx, {
+        type: 'radar',
+        data: {
+            labels: ['Assignment', 'Midterm', 'Final', 'GPA'],
+            datasets: [{
+                label: 'Average Scores',
+                data: [
+                    data?.assignment || 0,
+                    data?.midterm || 0,
+                    data?.final || 0,
+                    (data?.gpa || 0) * 25
+                ],
+                borderColor: '#4caf50',
+                backgroundColor: 'rgba(76, 175, 80, 0.1)'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                r: { beginAtZero: true, max: 100 }
+            }
+        }
+    });
+}
+
+function createCorrelationMatrix(data) {
+    if (!data || Object.keys(data).length === 0) {
+        document.getElementById('correlationMatrix').innerHTML = 
+            '<p style="color: var(--color-muted);">No correlation data available</p>';
+        return;
+    }
+    
+    let html = '<table class="correlation-table"><thead><tr><th></th>';
+    
+    const columns = Object.keys(data);
+    columns.forEach(col => {
+        html += `<th>${col.substring(0, 8)}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    
+    columns.forEach(row => {
+        html += `<tr><th>${row.substring(0, 8)}</th>`;
+        columns.forEach(col => {
+            const value = data[row]?.[col] || 0;
+            const absValue = Math.abs(value);
+            let className = 'corr-neutral';
+            
+            if (absValue > 0.6) className = value > 0 ? 'corr-positive' : 'corr-negative';
+            
+            html += `<td><div class="correlation-cell ${className}">${value.toFixed(2)}</div></td>`;
+        });
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    document.getElementById('correlationMatrix').innerHTML = html;
+}
+
+loadAnalytics();
+</script>
+{% endblock %}
